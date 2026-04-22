@@ -316,7 +316,7 @@ def save_train_mean_causal(model, save_path, dataloader, device, parms_path, spa
 
 
 
-def test(model, save_path, dataloader, device, parms_path, sparse_th):
+def test(model, save_path, dataloader, device, parms_path, sparse_th, beta=0):
     """
     ★★★ GCAD 핵심 함수 2: 테스트 데이터에서 이상 탐지 수행 ★★★
     (메모리 최적화 버전: 배치마다 바로 점수 계산 → GPU 메모리 절약)
@@ -408,12 +408,21 @@ def test(model, save_path, dataloader, device, parms_path, sparse_th):
         zero = torch.zeros_like(batch_causal_mat).to(device)
         batch_causal_mat = torch.where(batch_causal_mat < sparse_th, zero, batch_causal_mat)
         
-        # 편차 점수 계산 (논문 Eq.10)
+        # 편차 점수 계산 (논문 Eq.10 + Eq.11 + Eq.12)
         for s in range(batch_causal_mat.shape[0]):
+            # Sc: 인과 패턴 편차 (논문 Eq.10) — 전체 행렬
             temp_error = torch.abs(batch_causal_mat[s, :, :] - standard_causal_mat)
             temp_error = torch.div(temp_error, standard_causal_mat)
-            temp_error = torch.mean(temp_error)
-            all_err_scores.append(temp_error.item())  # CPU로 바로 저장
+            sc = torch.mean(temp_error)
+            
+            # St: 시간 패턴 편차 (논문 Eq.11) — 대각선만
+            diag_diff = torch.abs(torch.diag(batch_causal_mat[s, :, :]) - torch.diag(standard_causal_mat))
+            diag_norm = torch.diag(standard_causal_mat)
+            st = torch.mean(diag_diff / diag_norm)
+            
+            # S = Sc + β·St (논문 Eq.12)
+            score = sc + beta * st
+            all_err_scores.append(score.item())  # CPU로 바로 저장
         
         # 라벨도 CPU로 저장
         all_labels.extend(label.cpu().numpy().tolist())

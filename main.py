@@ -71,7 +71,7 @@ def main(args):
     """
     # ===== 장치 선택 및 시드 설정 =====
     device = torch.device(args.device)
-    set_seed(args.seed)
+    set_seed(0)
     
     # ===== 1단계: 데이터 로드 =====
     """
@@ -243,7 +243,8 @@ def main(args):
         test_data,                                 # 테스트 데이터
         args.device,
         parms_path=parms_path,                     # 정상 인과 패턴
-        sparse_th=args.sparse_th                   # 희소화 임계값 h
+        sparse_th=args.sparse_th,                  # 희소화 임계값 h
+        beta=args.pd_beta                          # β (논문 Eq.12)
     )
     return eva_list
 
@@ -286,6 +287,11 @@ def parse_args():
         '--sparse_th', type=float, default=0.005,
         help='희소화 임계값 h (논문 Section: Causality Graph Sparsification). '
              '이 값보다 작은 인과 효과는 노이즈로 간주하여 0으로 설정.'
+    )
+    parser.add_argument(
+        '--pd_beta', type=float, default=0,
+        help='β (논문 Eq.12): 인과 패턴 편차(Sc)와 시간 패턴 편차(St)의 균형. '
+             'S = Sc + β·St. 0이면 Sc만 사용.'
     )
     parser.add_argument(
         '--test_stride', type=int, default=1,
